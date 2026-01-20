@@ -1,32 +1,47 @@
-# 요구조건: 5개의 서브 프로세스를 Process로 만들고 돌려라. 서브 프로세스는 n *n 이어야한다. 서브 프로세스의 생명 주기에 신경 써라
-
-
-from multiprocessing import Process
-import logging
+from multiprocessing import Process, Pipe, current_process
 import time
 import os
 
 
-def func(arg):
-    # logging.info('Sub thread started: n%s', {arg})
-    # logging.info(arg)
-    print('Sub thread started: ', arg, os.getpid())
-    print(arg * arg)
-
-def main():
-    format = '%(asctime)s: %(message)s'
-    logging.basicConfig(format=format, level = logging.INFO, datefmt = '%H:%M:%S')
+def worker(id, baseNum, p):
     process_id = os.getpid()
-    processes = []
-    for p in range (5):
+    process_name = current_process().name
+    sub_total = 0
     
-        process = Process(target = func, args = (p,))
-        processes.append(process)
-        process.start()
-    logging.info('Main proccess joined', process_id)
-    for p in processes:
-        p.join()
-    logging.info('Main process is over')
+    for i in range(baseNum):
+        sub_total += 1
+        
+    p.send(sub_total)
+    p.close()    
+    
+    print(f'Process ID: {process_id}, Process Name: {process_name}, ID: {id}')
+    print(f'Result: {sub_total}')
 
+    
+def main():
+    process_id = os.getpid()
+    print('Main process ID', process_id)
+
+    start_time = time.time()          
+    
+    main_p, sub_p = Pipe()
+    
+    # pipe는 메인과 서브 간 1:1 통신이므로 for 지움
+    t = Process(name = str(1), target = worker, args = (1, 100000, sub_p))
+
+    t.start()      
+        
+    t.join()
+        
+    print('----- %s seconds-----' % (time.time() - start_time))
+    
+    
+        
+    print('Main-processing2 Done. Main-process Total count = {}'.format(main_p.recv()))
+     
+        
 if __name__ == '__main__':
     main()
+    
+    
+    # 5개의 추가 프로세스가 나눠서 작업한 값을 queue 에 보내고, 기존 프로세스가 queue 에서 받아서 total+= tmp 에서 총합
