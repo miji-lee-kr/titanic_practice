@@ -1,47 +1,65 @@
-from multiprocessing import Process, Pipe, current_process
+# blocking I/O : 인풋아웃풋 완료시까지 응답 대기. 다음 코드 실행 불가
+# 제어권이 I/O 작업에 잇음 -> 커널로 제어권 옮겨감 -> 응답 전까지 대기하는동안 제어권 잃음 -> 다른 작업 수행 불가
+
+# non-blocking I/O: 커널 IO 작업 완료 여부 상관 없이 즉시 응답
+# 제어권I/O -> 유저 프로세스 -> 다른 작업 지속 가능 -> 주기적으로 시스템 콜로 IO 작업 여부 확인
+
+# Async vs. Sync
+# async: IO 작업 완료 여부에 대한 알림은 커널 -> 유저 프로세스. call back 함수로
+# sync: 알림은 유저 프로세스 -> 커널 (호출되는 함수)
+
+# async + non_block IO/ block IO
+# sync + non_block IO / block IO
+
+
+
+import concurrent.futures
+import threading
+import requests 
 import time
-import os
+
+# 멀티 스레드 예제 (3초)가 순차실행 코드 (4초)보다 더 빠름
+
+# 각 스레드에 생성되는 객체 - 전역에 선언
+# 스레드는 변수를 공유하지만 각 스레드마다 동일한 이름의 별도의 변수로 쓰고 싶을 때
+thread_local = threading.local()
+# 각 스레드에 별도의 독립적 네임 스페이스 메모리 영역 할당받아 사용
 
 
-def worker(id, baseNum, p):
-    process_id = os.getpid()
-    process_name = current_process().name
-    sub_total = 0
-    
-    for i in range(baseNum):
-        sub_total += 1
+def get_session():
+    if not hasattr(thread_local, 'session'): # 워커가 지난 스레드 작업으로 이미 session을 갖고 있다면
+        thread_local.session = requests.Session()
+    return thread_local.session
+
+
+
+def request_website(url):
+    session = get_session()
+    print(session) # 세션을 여러번 돌려쓰는 것 보임
+    with session.get(url) as response:
+        print(f'[Read Content: {len(response.content)}, Status code: {response.status_code}], from {url}')
         
-    p.send(sub_total)
-    p.close()    
     
-    print(f'Process ID: {process_id}, Process Name: {process_name}, ID: {id}')
-    print(f'Result: {sub_total}')
+    
+    
+# 실행함수 2. 요청
+def request_all_website(urls):
+    with concurrent.futures.ThreadPoolExecutor(max_workers = 4) as executor:
+        executor.map(request_website, urls)
 
-    
 def main():
-    process_id = os.getpid()
-    print('Main process ID', process_id)
+    urls = [
+        "http://www.jython.org",
+        "http://olympus.realpython.org/dice",
+        "http://realpython.com"
+    ] * 3 
 
-    start_time = time.time()          
+    start_time = time.time()
+    request_all_website(urls)
     
-    main_p, sub_p = Pipe()
+    duration = time.time() - start_time
+    print(f'Downloaded {len(urls)} sites in {duration} seconds')
     
-    # pipe는 메인과 서브 간 1:1 통신이므로 for 지움
-    t = Process(name = str(1), target = worker, args = (1, 100000, sub_p))
 
-    t.start()      
-        
-    t.join()
-        
-    print('----- %s seconds-----' % (time.time() - start_time))
-    
-    
-        
-    print('Main-processing2 Done. Main-process Total count = {}'.format(main_p.recv()))
-     
-        
 if __name__ == '__main__':
     main()
-    
-    
-    # 5개의 추가 프로세스가 나눠서 작업한 값을 queue 에 보내고, 기존 프로세스가 queue 에서 받아서 total+= tmp 에서 총합
