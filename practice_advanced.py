@@ -20,8 +20,10 @@ class Robot:
         print("yes")
         
     
-    def cal_add(self,a,b): # a,b는 객체 생성시 필요한게 아니고 이미 생성된 객체가 부를 때만 필요하니 __init__에서 정의 안해줘도 됨
-        return a*b
+    def cal_add(self,a,b): # a,b는 __init__에서 정의 안함. 객체 생성시 필요한게 아니고 이미 생성된 객체가 부를 때만 필요하니
+        return a*b # a,b는 지역변수 (해당 메소드 부를 때만 전달)
+                # 만약 인스턴스 변수(인스턴스 전체에서 살아있어서, a 사용한 다른 메소드가 부를 때도 전달 됨)로 만들려면
+                # def(a): self._a = a return self._a 처럼 self붙여 정의해줘야 -> siri.cal_mult(_a)로 
     
 
     def __str__(self): 
